@@ -1,8 +1,29 @@
 /*
 
 Arduino Laser Tag
-2013 Kevin Anthony
-kevin@anthonynet.org
+
+Copyright (c) 2013, Kevin Anthony (kevin@anthonynet.org
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met: 
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer. 
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution. 
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
  
@@ -12,22 +33,27 @@ kevin@anthonynet.org
 #include "IRremote.h"
 
 // Defining bitmasks for custom letters on the segment display
-#define BM_P 0b01110011
-#define BM_U 0b00111110
-#define BM_G 0b00111101
-#define BM_O 0b00111111
+#define BM_A     0b01110111
+#define BM_D     0b00111111
+#define BM_E     0b01111001
+#define BM_G     0b00111101
+#define BM_O     0b00111111
+#define BM_P     0b01110011
+#define BM_S     0b01101101
+#define BM_U     0b00111110
+#define BM_DASH  0b01000000
+#define BM_CLEAR 0b00000000
+
 
 Adafruit_7segment matrix = Adafruit_7segment();
 
-uint8_t counter = 0;
-
+const int irSensorPin  = 2;    // IR Sensor
+const int fireLedPin   = 3;    // IR LED
 const int triggerPin   = 4;    // Trigger Switch
 const int reloadPin    = 6;    // Reloading Switch
-const int fireLedPin   = 3;    // IR LED
 const int myAmmoLedPin = 9;    // Out of Ammo LED
-const int hitLedPin    = 13;   // Hit Indicator
-const int irSensorPin  = 2;    // IR Sensor
 const int speakerPin   = 12;   // Piezo Speaker
+const int hitLedPin    = 13;   // Hit Indicator
 
 // Game play variables 
 int myCode             = 1;    // Unused at the moment
@@ -35,7 +61,8 @@ int maxHealth          = 3;    // Number of times you can get shot before dying
 int myHealth           = maxHealth;
 int maxAmmo            = 30;   // Amount of ammo returned on a reload
 int ammoCount          = 30;   // Starting ammo
-int deadTime           = 1000; // Number of ms you stay dead
+int deadTime           = 3000; // Number of ms you stay dead
+int deathCount         = 0;
 
 // Initial states for state stores
 int triggerState       = LOW;       
@@ -99,6 +126,7 @@ void loop() {
     // Player1 = 3978641416;
     // Player2 = 275977667;
     // TODO: Need to change this to accept a range so more than two 'teams' can be in play
+    //       Probalby shouldn't be doing this gross decimal parsing too on the binary values.
     
     if (results.value == 275977667) {
       Serial.println("HIT HIT HIT");
@@ -110,28 +138,39 @@ void loop() {
       myHealth--;
       if (myHealth <= 0) {
         Serial.println("DEAD!"); 
-        matrix.blinkRate(3);
-        matrix.writeDigitNum(0, 'D');
-        matrix.writeDigitNum(1, 'E');
-        matrix.writeDigitNum(3, 'A');
-        matrix.writeDigitNum(4, 'D');
+        deathCount++;
+        matrix.blinkRate(1);
+        matrix.writeDigitRaw(0, BM_D);
+        matrix.writeDigitRaw(1, BM_E);
+        matrix.writeDigitRaw(3, BM_A);
+        matrix.writeDigitRaw(4, BM_D);
         matrix.writeDisplay();
         playTone(5000, 1000);      
         delay(deadTime);
         matrix.blinkRate(0);
-        matrix.print(ammoCount, DEC);
-        matrix.writeDisplay();
+        matrix.print(deathCount, DEC);
+        matrix.writeDigitRaw(0, BM_S);
+        matrix.writeDigitRaw(1, BM_DASH);
+        matrix.writeDisplay();        
+        delay(2000);
+        matrix.writeDigitRaw(0, BM_CLEAR);
+        matrix.writeDigitRaw(1, BM_G);
+        matrix.writeDigitRaw(3, BM_O);
+        matrix.writeDigitRaw(4, BM_CLEAR);
+        matrix.writeDisplay();  
         myHealth = maxHealth;
+        ammoCount = maxAmmo;       
         Serial.println("Ready again!"); 
 
       } else {
         Serial.print("Health: ");
         Serial.println(myHealth); 
       }
-      
+      digitalWrite(hitLedPin, LOW);
+
       
     } else {
-      Serial.println("IR Signal but not a hit");
+      Serial.println("IR signal received but not recognized");
       digitalWrite(hitLedPin, LOW);
 
     }
